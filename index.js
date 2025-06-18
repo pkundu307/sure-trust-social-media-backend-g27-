@@ -1,6 +1,20 @@
-console.log("Starting Sure Trust Social Media Backend...");const express = require('express');
+import express from 'express';
+import mongoose from 'mongoose';
+import { connectToDatabase } from './utilities/DbConnect.js';
+import authRoutes from './routes/auth.routes.js';
+const server= express();
 
-const app = express();
-const port = 3000; 
-console.log("my name is krushna patil");    
 
+server.use(express.json());
+server.use(express.urlencoded({ extended: true }));
+server.use('/api/auth', authRoutes);
+
+
+
+
+
+connectToDatabase()
+const PORT=3000;
+server.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
+});
