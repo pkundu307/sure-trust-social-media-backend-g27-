@@ -29,3 +29,25 @@ if(!name || !email || !password) {
         res.status(500).json({ message: "Internal server error" });
     }
 }
+
+export const login = async (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+    }
+    try {
+        const user = await User.find({email})
+        if (!user || user.length === 0) {
+            return res.status(400).json({ message: "Invalid email or password" });
+        }
+        const isPasswordValid = await bcrypt.compare(password, user[0].password);
+        if (!isPasswordValid) {
+            return res.status(400).json({ message: "Invalid email or password" });
+        }
+        const token = jwt.sign({ userId: user[0]._id }, 'prasanna', { expiresIn: '1h' });
+        res.status(200).json({ token, user: { id: user[0]._id, name: user[0].name, email: user[0].email } });
+    } catch (error) {
+        console.error("Error logging in user:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+}
