@@ -20,7 +20,7 @@ export const updateProfile = async (req, res) => {
     }
     try {
         const user = await User.findByIdAndUpdate(
-            req.user.id,
+            req.user.userId,
             { name, email,bio },
             { new: true, runValidators: true }
         ).select("-password");
