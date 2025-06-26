@@ -94,4 +94,39 @@ export const getAllFriends = async (req, res) => {
       res.status(500).json({ message: 'Failed to fetch friends' });
     }
   };
+  export const getMutualFriends = async (req, res) => {
+    const userId = req.user.userId;
+  
+    try {
+      // Get logged-in user's friends
+      const user = await User.findById(userId).populate('followers', '_id name');
+
+      const userFriendIds = user.followers.map(friend => friend._id.toString());
+    
+      const mutualMap = new Map();
+  
+      // Loop through each friend and check their friends
+      for (const friend of user.followers) {
+        const friendData = await User.findById(friend._id).populate('followers', '_id name profilePicture');
+        
+        friendData.followers.forEach((f) => {
+          const fId = f._id.toString();
+            console.log(fId);
+            
+          // Check if this friend is also in my friend list and not me
+        //   if (fId !== userId && userFriendIds.includes(fId)) {
+            mutualMap.set(fId, f); // ensure uniqueness
+        //   }
+        });
+      }
+  
+      let mutualFriends = Array.from(mutualMap.values());
+      mutualFriends = mutualFriends.filter(friend => friend._id.toString() !== userId); // Exclude self
+      console.log(mutualFriends, 'mutualFriends');
+      res.status(200).json(mutualFriends);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: 'Failed to get mutual friends' });
+    }
+  };
   

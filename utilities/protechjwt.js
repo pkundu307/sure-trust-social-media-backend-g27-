@@ -9,9 +9,7 @@ export const protect= (req, res, next) => {
     }
     try {
         const decoded = jwt.verify(token, 'prasanna');
-        console.log('====================================');
-        console.log(decoded);
-        console.log('====================================');
+
         req.user = decoded; // Attach user info to request object
         next(); // Proceed to the next middleware or route handler
     } catch (error) {
