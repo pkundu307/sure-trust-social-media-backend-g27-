@@ -1,30 +1,84 @@
 import { Post } from "../models/Post.js";
 
-export const addPost = async (req,res)=>{
-    const {text,image}=req.body;
-    try {
-        const post = await Post.create({
-            user:req.user.userId,
-            text,
-            image
-        })
-        res.status(201).json(post)
-    } catch (error) {
-        console.error(error)
-    }
-}
+export const addPost = async (req, res) => {
+  const { text, image } = req.body;
+  try {
+    const post = await Post.create({
+      user: req.user.userId,
+      text,
+      image,
+    });
+    res.status(201).json(post);
+  } catch (error) {
+    console.error(error);
+  }
+};
 
-export const getAllPosts =async(req,res)=>{
-    try {
-       const user=req.user.userId
-       console.log(user,'0-0-0-');
-       
-        const posts=await Post.find({user})
-        .sort({createdAt:-1})
-        .populate('user')
+export const getAllPosts = async (req, res) => {
+  try {
+    const user = req.user.userId;
+    console.log(user, "0-0-0-");
 
-        res.status(200).json(posts)
-    } catch (error) {
-        console.error(error)
+    const posts = await Post.find({ user })
+      .sort({ createdAt: -1 })
+      .populate("user");
+
+    res.status(200).json(posts);
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+export const likePost = async (req, res) => {
+  const postId = req.params.id;
+  const userId = req.user.userId;
+
+  try {
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
     }
-}
+
+    if (post.likes.includes(userId)) {
+      // User already liked the post, so we remove the like
+      post.likes = post.likes.filter((id) => id.toString() !== userId);
+    } else {
+      // User has not liked the post, so we add the like
+      post.likes.push(userId);
+    }
+
+    await post.save();
+    res.status(200).json(post);
+  } catch (error) {
+    console.error("Error liking/unliking post:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const addComment = async (req, res) => {
+    const postId = req.params.id;
+    const userId = req.user.userId;
+    const { text } = req.body;
+  
+    try {
+      const post = await Post.findById(postId);
+        
+      if (!post) return res.status(404).json({ message: 'Post not found' });
+  
+      const comment = {
+        user: userId,
+        text,
+        createdAt: new Date(),
+      };
+      console.log(comment, "comment");
+      
+  
+      post.comments.push(comment);
+      await post.save();
+  
+      res.status(201).json({ message: 'Comment added', comments: post.comments });
+    } catch (err) {
+      res.status(500).json({ message: 'Failed to comment' });
+    }
+  };
+  
