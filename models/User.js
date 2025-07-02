@@ -9,6 +9,6 @@ const userSchema = new mongoose.Schema({
     profilePicture:String,
     followers:[{type:mongoose.Schema.Types.ObjectId,ref:'User'}],
     following:[{type:mongoose.Schema.Types.ObjectId,ref:'User'}],
-},{timeStamp:true})
+},{timestamps:true})
 
 export const User = mongoose.model('User', userSchema);

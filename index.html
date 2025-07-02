@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Socket.IO Chat Tester</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+</head>
+<body>
+
+  <h2>💬 Socket.IO Chat Test</h2>
+
+  <label>Sender ID:</label>
+  <input type="text" id="senderId" placeholder="e.g., 64b9f6e5d...">
+
+  <label>Receiver ID:</label>
+  <input type="text" id="receiverId" placeholder="e.g., 64b9a1d2e...">
+
+  <label>Message:</label>
+  <input type="text" id="message" placeholder="Enter message">
+
+  <button onclick="sendMessage()">Send Message</button>
+
+  <div class="log" id="log"></div>
+
+  <script>
+    const socket = io("http://localhost:3000");
+
+    // Setup after connection
+    socket.on("connect", () => {
+      console.log("Connected:", socket.id);
+    });
+
+    // Log incoming message
+    socket.on("receive_message", (msg) => {
+      logMessage("📩 Received: " + JSON.stringify(msg));
+    });
+
+    function sendMessage() {
+      const senderId = document.getElementById("senderId").value.trim();
+      const receiverId = document.getElementById("receiverId").value.trim();
+      const content = document.getElementById("message").value.trim();
+
+      if (!senderId || !receiverId || !content) {
+        alert("Fill in all fields");
+        return;
+      }
+
+      // Send setup first (register senderId)
+      socket.emit("setup", senderId);
+
+      const payload = { senderId, receiverId, content };
+      socket.emit("send_message", payload);
+
+      logMessage("📤 Sent: " + JSON.stringify(payload));
+    }
+
+    function logMessage(text) {
+      const log = document.getElementById("log");
+      const p = document.createElement("p");
+      p.textContent = text;
+      log.appendChild(p);
+      log.scrollTop = log.scrollHeight;
+    }
+  </script>
+
+</body>
+</html>
