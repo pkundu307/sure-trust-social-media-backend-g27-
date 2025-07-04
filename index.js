@@ -9,7 +9,7 @@ import userRoutes from "./routes/user.route.js";
 import postRoutes from "./routes/post.routes.js";
 import friendRequestRoutes from "./routes/friendRequest.routes.js";
 import friendRoutes from "./routes/friend.route.js";
-
+import chatRoutes from "./routes/chat.route.js";
 import { Chat } from "./models/chat.schema.js";
 import { Message } from "./models/message.schema.js";
 
@@ -37,7 +37,7 @@ app.use("/api/user", userRoutes);
 app.use("/api/post", postRoutes);
 app.use("/api/friendRequest", friendRequestRoutes);
 app.use("/api/friends", friendRoutes);
-
+app.use("/api/chat",chatRoutes)
 // 🌍 DB Connection
 connectToDatabase();
 
