@@ -58,16 +58,22 @@ export const likePost = async (req, res) => {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    if (post.likes.includes(userId)) {
-      // User already liked the post, so we remove the like
-      post.likes = post.likes.filter((id) => id.toString() !== userId);
-    } else {
-      // User has not liked the post, so we add the like
-      post.likes.push(userId);
+    let isLiked = false;
+    if(post.likes.includes(userId)){
+      post.likes=post.likes.filter((id)=>id.toString()!==userId)
+    }else{
+      post.likes.push(userId)
+      isLiked=true;
     }
-
     await post.save();
-    res.status(200).json(post);
+      console.log(post);
+      
+    const updatePost=await Post.findById(postId)
+
+    io.emit('post_liked',{
+      postId,likes:updatePost.likes
+    })
+    res.status(200).json({post:updatePost,liked:isLiked})
   } catch (error) {
     console.error("Error liking/unliking post:", error);
     res.status(500).json({ message: "Internal server error" });

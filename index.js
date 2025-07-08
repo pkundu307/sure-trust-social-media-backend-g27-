@@ -23,7 +23,7 @@ const io = new Server(server, {
     methods: ["GET", "POST"],
   },
 });
-
+global.io=io;// this io object will be globally accessable
 const usersSocketMap = new Map(); // userId => socket.id
 
 // 🌐 Middleware
