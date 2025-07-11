@@ -19,7 +19,7 @@ export const getMyAllPosts = async (req, res) => {
     const user = req.user.userId;
     console.log(user, "0-0-0-");
 
-    const posts = await Post.find({ user })
+    const posts = await Post.find({ user, deleteAt: null })
       .sort({ createdAt: -1 })
       .populate("user");
 
@@ -37,7 +37,7 @@ export const getAllPosts = async (req, res) => {
     const friendIds = mainUser.followers.map(id=> id.toString());
     friendIds.push(user.toString());
 
-    const posts = await Post.find({ user:{$in:friendIds} })
+    const posts = await Post.find({ user:{$in:friendIds}, deletedAt: null })
       .sort({ createdAt: -1 })
       .populate("user",'name profilePicture')
       .populate("comments.user", "name profilePicture");
@@ -119,8 +119,19 @@ export const addComment = async (req, res) => {
         return res.status(403).json({ message: "You are not authorized to delete this post" });
       }
       //3. Delete the post
-      await Post.findByIdAndDelete(postId);
-      res.status(200).json({ message: "Post deleted successfully" });
+      //4.Soft delete: set deletedAt
+      const updated = await Post.findByIdAndUpdate(
+        postId,
+        { deletedAt: new Date() }, // mark as deleted
+        { new: true }
+      );
+
+    if (!updated) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+
+      res.status(200).json({ message: "Post soft-deleted successfully" });
     } catch (error) {
       console.error("Error deleting post:", error);
       res.status(500).json({ message: "Internal server error" });
