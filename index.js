@@ -3,7 +3,7 @@ import cors from "cors";
 import http from "http";
 import { Server } from "socket.io";
 import { connectToDatabase } from "./utilities/DbConnect.js";
-
+import { configDotenv } from "dotenv";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.route.js";
 import postRoutes from "./routes/post.routes.js";
@@ -12,10 +12,13 @@ import friendRoutes from "./routes/friend.route.js";
 import chatRoutes from "./routes/chat.route.js";
 import { Chat } from "./models/chat.schema.js";
 import { Message } from "./models/message.schema.js";
+import cloudinary from "cloudinary"
+import multer from "multer";
+
 
 const app = express();
 const server = http.createServer(app);
-
+configDotenv()
 // ⚡ Setup Socket.IO
 const io = new Server(server, {
   cors: {
@@ -94,9 +97,46 @@ io.on("connection", (socket) => {
     console.log("🚫 Socket disconnected:", socket.id);
   });
 });
+console.log(process.env.CLOUD_NAME);
+
+cloudinary.config({
+  cloud_name: process.env.CLOUD_NAME,
+  api_key: process.env.API_KEY,
+  api_secret: process.env.API_SECRET,
+});
+
+
+async function handleUpload(file) {
+  const res = await cloudinary.uploader.upload(file, {
+    resource_type: "auto",
+  });
+  return res;
+}
+const storage = new multer.memoryStorage();
+const upload = multer({
+  storage,
+});
+app.post("/upload", upload.single("my_file"), async (req, res) => {
+  try {
+    const b64 = Buffer.from(req.file.buffer).toString("base64");
+    // console.log(b64);
+    
+    let dataURI = "data:" + req.file.mimetype + ";base64," + b64;
+    console.log(dataURI);
+    
+    const cldRes = await handleUpload(dataURI);
+    res.json(cldRes);
+  } catch (error) {
+    console.log(error);
+    res.send({
+      message: error.message,
+    });
+  }
+});
+
 
 // 🟢 Start Server
-const PORT = 3000;
+const PORT = process.env.PORT;
 server.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
 });
