@@ -5,7 +5,8 @@ import {
   getAllPosts,
   getMyAllPosts,
   likePost,
-  deletePost, // delete
+  deletePost, // delete post
+  softDeletePost, // soft delete
 } from "../controllers/post.controller.js";
 
 import { protect } from "../utilities/protechjwt.js";
@@ -19,6 +20,7 @@ router.post("/like/:id", protect, likePost);
 router.post("/comment/:id", protect, addComment);
 
 // task 1 route added
-router.delete("/post/:id", protect, deletePost);
+router.delete("/delete/:id", protect, deletePost);
+router.delete("/softDelete/:id", protect, softDeletePost);
 
 export default router;

@@ -107,7 +107,7 @@ export const addComment = async (req, res) => {
     }
   };
 
-  export const deletePost = async (req,res)=>{
+  export const softDeletePost = async (req,res)=>{
     const postId = req.params.id;
     const userId = req.user.userId;
     try {
@@ -118,7 +118,7 @@ export const addComment = async (req, res) => {
       if(post.user.toString() !== userId) {
         return res.status(403).json({ message: "You are not authorized to delete this post" });
       }
-      //3. Delete the post
+      
       //4.Soft delete: set deletedAt
       const updated = await Post.findByIdAndUpdate(
         postId,
@@ -132,6 +132,26 @@ export const addComment = async (req, res) => {
 
 
       res.status(200).json({ message: "Post soft-deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  };
+
+  export const deletePost = async (req,res)=>{
+    const postId = req.params.id;
+    const userId = req.user.userId;
+    try {
+      //1. Find the post by ID
+      const post =await Post.findById(postId);
+      if(!post) return res.status(404).json({message:"Post not found"});
+      //2. Check if the post belongs to the user
+      if(post.user.toString() !== userId) {
+        return res.status(403).json({ message: "You are not authorized to delete this post" });
+      }
+      //3. Delete the post completely from both UI and database
+      await Post.findByIdAndDelete(postId);
+      res.status(200).json({ message: "Post deleted successfully" });
     } catch (error) {
       console.error("Error deleting post:", error);
       res.status(500).json({ message: "Internal server error" });
