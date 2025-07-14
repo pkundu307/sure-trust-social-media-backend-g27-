@@ -157,3 +157,41 @@ export const addComment = async (req, res) => {
       res.status(500).json({ message: "Internal server error" });
     }
   };
+
+
+export const restorePost = async (req, res) => {
+  const postId = req.params.id;
+  const userId = req.user.userId;
+
+  try {
+    const post = await Post.findById(postId);
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    if (post.user.toString() !== userId) {
+      return res.status(403).json({ message: "You are not authorized to restore this post" });
+    }
+
+    post.deletedAt = null;  // Reset the deletedAt flag
+    await post.save();
+
+    res.status(200).json({ message: "Post restored successfully" });
+  } catch (error) {
+    console.error("Error restoring post:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const getMyDeletedPosts = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const deletedPosts = await Post.find({ user: userId, deletedAt: { $ne: null } })
+      .sort({ deletedAt: -1 })
+      .populate("user", "name profilePicture");
+
+    res.status(200).json(deletedPosts);
+  } catch (error) {
+    console.error("Error fetching deleted posts:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
