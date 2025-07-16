@@ -1,5 +1,5 @@
 import { Post } from "../models/Post.js";
-import {User}from "../models/User.js";
+import { User }from "../models/User.js";
 export const addPost = async (req, res) => {
   const { text, image } = req.body;
   try {
@@ -107,57 +107,44 @@ export const addComment = async (req, res) => {
     }
   };
 
-  export const softDeletePost = async (req,res)=>{
-    const postId = req.params.id;
-    const userId = req.user.userId;
-    try {
-      //1. Find the post by ID
-      const post =await Post.findById(postId);
-      if(!post) return res.status(404).json({message:"Post not found"});
-      //2. Check if the post belongs to the user
-      if(post.user.toString() !== userId) {
-        return res.status(403).json({ message: "You are not authorized to delete this post" });
-      }
-      
-      //4.Soft delete: set deletedAt
-      const updated = await Post.findByIdAndUpdate(
-        postId,
-        { deletedAt: new Date() }, // mark as deleted
-        { new: true }
-      );
+export const softDeletePost = async (req, res) => {
+  const postId = req.params.id;
+  const userId = req.user.userId;
 
-    if (!updated) {
-      return res.status(404).json({ message: 'Post not found' });
-    }
+  try {
+    const post = await Post.findById(postId);
+    if (!post) return res.status(404).json({ message: "Post not found" });
+    if (post.user.toString() !== userId)
+      return res.status(403).json({ message: "Not authorized to delete" });
 
+    post.isDeleted = true;
+    post.deletedAt = new Date();
+    await post.save();
 
-      res.status(200).json({ message: "Post soft-deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting post:", error);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  };
+    res.status(200).json({ message: "Post soft-deleted successfully" });
+  } catch (error) {
+    console.error("Error soft deleting post:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
 
-  export const deletePost = async (req,res)=>{
-    const postId = req.params.id;
-    const userId = req.user.userId;
-    try {
-      //1. Find the post by ID
-      const post =await Post.findById(postId);
-      if(!post) return res.status(404).json({message:"Post not found"});
-      //2. Check if the post belongs to the user
-      if(post.user.toString() !== userId) {
-        return res.status(403).json({ message: "You are not authorized to delete this post" });
-      }
-      //3. Delete the post completely from both UI and database
-      await Post.findByIdAndDelete(postId);
-      res.status(200).json({ message: "Post deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting post:", error);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  };
+export const deletePost = async (req, res) => {
+  const postId = req.params.id;
+  const userId = req.user.userId;
 
+  try {
+    const post = await Post.findById(postId);
+    if (!post) return res.status(404).json({ message: "Post not found" });
+    if (post.user.toString() !== userId)
+      return res.status(403).json({ message: "Not authorized to delete" });
+
+    await Post.findByIdAndDelete(postId);
+    res.status(200).json({ message: "Post permanently deleted" });
+  } catch (error) {
+    console.error("Error deleting post:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
 
 export const restorePost = async (req, res) => {
   const postId = req.params.id;
@@ -166,12 +153,11 @@ export const restorePost = async (req, res) => {
   try {
     const post = await Post.findById(postId);
     if (!post) return res.status(404).json({ message: "Post not found" });
+    if (post.user.toString() !== userId)
+      return res.status(403).json({ message: "Not authorized to restore" });
 
-    if (post.user.toString() !== userId) {
-      return res.status(403).json({ message: "You are not authorized to restore this post" });
-    }
-
-    post.deletedAt = null;  // Reset the deletedAt flag
+    post.isDeleted = false;
+    post.deletedAt = null;
     await post.save();
 
     res.status(200).json({ message: "Post restored successfully" });
@@ -185,7 +171,7 @@ export const getMyDeletedPosts = async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    const deletedPosts = await Post.find({ user: userId, deletedAt: { $ne: null } })
+    const deletedPosts = await Post.find({ user: userId, isDeleted: true })
       .sort({ deletedAt: -1 })
       .populate("user", "name profilePicture");
 
