@@ -1,19 +1,84 @@
 import { Post } from "../models/Post.js";
 import { User }from "../models/User.js";
+import cloudinary from 'cloudinary';
+import multer from 'multer';
+
+// --- Cloudinary Configuration ---
+// It's best practice to configure this once when your app starts, 
+// but including it here for a self-contained controller file.
+cloudinary.v2.config({
+  cloud_name: process.env.CLOUD_NAME,
+  api_key: process.env.API_KEY,
+  api_secret: process.env.API_SECRET,
+  secure: true, // It's a good practice to force https
+});
+
+// --- Cloudinary Upload Helper ---
+// This helper function uploads a file buffer to Cloudinary
+async function handleUpload(file) {
+  const res = await cloudinary.v2.uploader.upload(file, {
+    resource_type: "auto", // Automatically detect the resource type (image, video, etc.)
+  });
+  return res;
+}
+
+// --- Multer Configuration ---
+// We use memoryStorage to temporarily hold the file in memory as a buffer
+// before it's uploaded to Cloudinary. This avoids saving it to the server's disk.
+const storage = multer.memoryStorage();
+export const upload = multer({
+  storage,
+});
+
+// --- Main Controller: Add a New Post ---
 export const addPost = async (req, res) => {
-  const { text, image } = req.body;
   try {
-    const post = await Post.create({
+    // 1. Get text content from the request body
+    const { text } = req.body;
+
+    // The 'protect' middleware should have already added the user to the request
+    if (!req.user || !req.user.userId) {
+        return res.status(401).json({ message: "Not authorized, user not found." });
+    }
+
+    if (!text) {
+        return res.status(400).json({ message: "Post text is required." });
+    }
+
+    let imageUrl = null; // Initialize imageUrl as null
+
+    // 2. Check if a file was uploaded
+    if (req.file) {
+      // Convert the buffer to a base64 data URI
+      const b64 = Buffer.from(req.file.buffer).toString("base64");
+      let dataURI = "data:" + req.file.mimetype + ";base64," + b64;
+
+      // Upload the data URI to Cloudinary
+      const cldRes = await handleUpload(dataURI);
+      
+      // Store the secure URL of the uploaded image
+      imageUrl = cldRes.secure_url;
+    }
+
+    // 3. Create the new post in the database
+    const newPost = await Post.create({
       user: req.user.userId,
-      text,
-      image,
+      text: text,
+      // If imageUrl is not null, it will be added. Otherwise, the field will be omitted.
+      image: imageUrl, 
     });
-    res.status(201).json(post);
+
+    // 4. Send a successful response
+    res.status(201).json(newPost);
+
   } catch (error) {
-    console.error(error);
+    console.error("Error creating post:", error);
+    res.status(500).json({ 
+      message: "Server error while creating post.",
+      error: error.message 
+    });
   }
 };
-
 export const getMyAllPosts = async (req, res) => {
   try {
     const user = req.user.userId;

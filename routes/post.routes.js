@@ -2,6 +2,7 @@ import express from "express";
 import {
   addComment,
   addPost,
+  upload,
   getAllPosts,
   getMyAllPosts,
   likePost,
@@ -15,7 +16,8 @@ import { protect } from "../utilities/protechjwt.js";
 
 const router = express.Router();
 
-router.post("/add", protect, addPost);
+router.post('/add', protect, upload.single('image'), addPost);
+
 router.get("/all", protect, getAllPosts);
 router.get("/allofme", protect, getMyAllPosts);
 router.post("/like/:id", protect, likePost);
