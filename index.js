@@ -43,7 +43,7 @@ const io = new Server(server, {
   },
 });
 global.io = io;
-
+const usersSocketMap = new Map();
 app.use((req, res, next) => {
   req.io = io;
   next();
