@@ -1,89 +1,70 @@
 import { Post } from "../models/Post.js";
-import { User }from "../models/User.js";
-import cloudinary from 'cloudinary';
-import multer from 'multer';
+import { User } from "../models/User.js";
+import cloudinary from "cloudinary";
+import multer from "multer";
 
 // --- Cloudinary Configuration ---
-// It's best practice to configure this once when your app starts, 
-// but including it here for a self-contained controller file.
 cloudinary.v2.config({
   cloud_name: process.env.CLOUD_NAME,
   api_key: process.env.API_KEY,
   api_secret: process.env.API_SECRET,
-  secure: true, // It's a good practice to force https
+  secure: true,
 });
 
 // --- Cloudinary Upload Helper ---
-// This helper function uploads a file buffer to Cloudinary
 async function handleUpload(file) {
   const res = await cloudinary.v2.uploader.upload(file, {
-    resource_type: "auto", // Automatically detect the resource type (image, video, etc.)
+    resource_type: "auto",
   });
   return res;
 }
 
 // --- Multer Configuration ---
-// We use memoryStorage to temporarily hold the file in memory as a buffer
-// before it's uploaded to Cloudinary. This avoids saving it to the server's disk.
 const storage = multer.memoryStorage();
-export const upload = multer({
-  storage,
-});
+export const upload = multer({ storage });
 
-// --- Main Controller: Add a New Post ---
+// --- Add a New Post ---
 export const addPost = async (req, res) => {
   try {
-    // 1. Get text content from the request body
     const { text } = req.body;
 
-    // The 'protect' middleware should have already added the user to the request
     if (!req.user || !req.user.userId) {
-        return res.status(401).json({ message: "Not authorized, user not found." });
+      return res.status(401).json({ message: "Not authorized, user not found." });
     }
 
     if (!text) {
-        return res.status(400).json({ message: "Post text is required." });
+      return res.status(400).json({ message: "Post text is required." });
     }
 
-    let imageUrl = null; // Initialize imageUrl as null
+    let imageUrl = null;
 
-    // 2. Check if a file was uploaded
     if (req.file) {
-      // Convert the buffer to a base64 data URI
       const b64 = Buffer.from(req.file.buffer).toString("base64");
       let dataURI = "data:" + req.file.mimetype + ";base64," + b64;
-
-      // Upload the data URI to Cloudinary
       const cldRes = await handleUpload(dataURI);
-      
-      // Store the secure URL of the uploaded image
       imageUrl = cldRes.secure_url;
     }
 
-    // 3. Create the new post in the database
     const newPost = await Post.create({
       user: req.user.userId,
-      text: text,
-      // If imageUrl is not null, it will be added. Otherwise, the field will be omitted.
-      image: imageUrl, 
+      text,
+      image: imageUrl,
     });
 
-    // 4. Send a successful response
     res.status(201).json(newPost);
-
   } catch (error) {
     console.error("Error creating post:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: "Server error while creating post.",
-      error: error.message 
+      error: error.message,
     });
   }
 };
+
+// --- Get My All Posts ---
 export const getMyAllPosts = async (req, res) => {
   try {
     const user = req.user.userId;
-    console.log(user, "0-0-0-");
-
     const posts = await Post.find({ user, deleteAt: null })
       .sort({ createdAt: -1 })
       .populate("user");
@@ -94,17 +75,17 @@ export const getMyAllPosts = async (req, res) => {
   }
 };
 
+// --- Get All Friend Posts ---
 export const getAllPosts = async (req, res) => {
   try {
     const user = req.user.userId;
-    console.log(req.user, "0-0-0-");
-    const mainUser = await User.findById(req.user.userId).select('followers')
-    const friendIds = mainUser.followers.map(id=> id.toString());
+    const mainUser = await User.findById(user).select("followers");
+    const friendIds = mainUser.followers.map((id) => id.toString());
     friendIds.push(user.toString());
 
-    const posts = await Post.find({ user:{$in:friendIds}, deletedAt: null })
+    const posts = await Post.find({ user: { $in: friendIds }, deletedAt: null })
       .sort({ createdAt: -1 })
-      .populate("user",'name profilePicture')
+      .populate("user", "name profilePicture")
       .populate("comments.user", "name profilePicture");
 
     res.status(200).json(posts);
@@ -113,6 +94,7 @@ export const getAllPosts = async (req, res) => {
   }
 };
 
+// --- Like / Unlike Post + Emit Socket Event ---
 export const likePost = async (req, res) => {
   const postId = req.params.id;
   const userId = req.user.userId;
@@ -124,54 +106,55 @@ export const likePost = async (req, res) => {
     }
 
     let isLiked = false;
-    if(post.likes.includes(userId)){
-      post.likes=post.likes.filter((id)=>id.toString()!==userId)
-    }else{
-      post.likes.push(userId)
-      isLiked=true;
+    if (post.likes.includes(userId)) {
+      post.likes = post.likes.filter((id) => id.toString() !== userId);
+    } else {
+      post.likes.push(userId);
+      isLiked = true;
     }
-    await post.save();
-      console.log(post);
-      
-    const updatePost=await Post.findById(postId)
 
-    io.emit('post_liked',{
-      postId,likes:updatePost.likes
-    })
-    res.status(200).json({post:updatePost,liked:isLiked})
+    await post.save();
+
+    const updatedPost = await Post.findById(postId).populate("user", "name profilePicture");
+    // ✅ Emit socket event
+    req.io.emit("post_liked", {
+      postId: updatedPost._id.toString(),
+      likes: updatedPost.likes,
+    });
+
+    res.status(200).json({ post: updatedPost, liked: isLiked });
   } catch (error) {
     console.error("Error liking/unliking post:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
 
+// --- Add Comment to Post ---
 export const addComment = async (req, res) => {
-    const postId = req.params.id;
-    const userId = req.user.userId;
-    const { text } = req.body;
-  
-    try {
-      const post = await Post.findById(postId);
-        
-      if (!post) return res.status(404).json({ message: 'Post not found' });
-  
-      const comment = {
-        user: userId,
-        text,
-        createdAt: new Date(),
-      };
-      console.log(comment, "comment");
-      
-  
-      post.comments.push(comment);
-      await post.save();
-  
-      res.status(201).json({ message: 'Comment added', comments: post.comments });
-    } catch (err) {
-      res.status(500).json({ message: 'Failed to comment' });
-    }
-  };
+  const postId = req.params.id;
+  const userId = req.user.userId;
+  const { text } = req.body;
 
+  try {
+    const post = await Post.findById(postId);
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    const comment = {
+      user: userId,
+      text,
+      createdAt: new Date(),
+    };
+
+    post.comments.push(comment);
+    await post.save();
+
+    res.status(201).json({ message: "Comment added", comments: post.comments });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to comment" });
+  }
+};
+
+// --- Soft Delete Post ---
 export const softDeletePost = async (req, res) => {
   const postId = req.params.id;
   const userId = req.user.userId;
@@ -193,6 +176,7 @@ export const softDeletePost = async (req, res) => {
   }
 };
 
+// --- Permanently Delete Post ---
 export const deletePost = async (req, res) => {
   const postId = req.params.id;
   const userId = req.user.userId;
@@ -211,6 +195,7 @@ export const deletePost = async (req, res) => {
   }
 };
 
+// --- Restore Post ---
 export const restorePost = async (req, res) => {
   const postId = req.params.id;
   const userId = req.user.userId;
@@ -232,6 +217,7 @@ export const restorePost = async (req, res) => {
   }
 };
 
+// --- Get My Deleted Posts ---
 export const getMyDeletedPosts = async (req, res) => {
   try {
     const userId = req.user.userId;
