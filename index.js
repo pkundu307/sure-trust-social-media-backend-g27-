@@ -14,29 +14,42 @@ import storyRoutes from "./routes/story.routes.js"
 import notificationRoutes from "./routes/notification.route.js"
 import { Chat } from "./models/chat.schema.js";
 import { Message } from "./models/message.schema.js";
-import cloudinary from "cloudinary"
+import cloudinary from "cloudinary";
 import multer from "multer";
 
+configDotenv();
 
 const app = express();
 const server = http.createServer(app);
-configDotenv()
-// ⚡ Setup Socket.IO
-const io = new Server(server, {
-  cors: {
-    origin: "*", // Change to your frontend origin in production
-    methods: ["GET", "POST"],
-  },
-});
-global.io=io;// this io object will be globally accessable
-const usersSocketMap = new Map(); // userId => socket.id
 
-// 🌐 Middleware
-app.use(cors());
+// ✅ CORRECT CORS SETUP
+app.use(
+  cors({
+    origin: "http://localhost:5173", // ✅ Your frontend URL
+    credentials: true,
+  })
+);
+
+// ✅ MIDDLEWARE
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 🛣️ Routes
+// ✅ SOCKET.IO SETUP
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  },
+});
+global.io = io;
+
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
+// ✅ ROUTES
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/post", postRoutes);
@@ -54,13 +67,12 @@ io.on("connection", (socket) => {
 
   socket.on("setup", (userId) => {
     usersSocketMap.set(userId, socket.id);
-    socket.join(userId); // Join room by userId
+    socket.join(userId);
     console.log(`🟢 User ${userId} joined socket`);
   });
 
   socket.on("send_message", async ({ senderId, receiverId, content }) => {
     try {
-      // 1. Find or create Chat
       let chat = await Chat.findOne({
         isGroupChat: false,
         users: { $all: [senderId, receiverId] },
@@ -70,7 +82,6 @@ io.on("connection", (socket) => {
         chat = await Chat.create({ users: [senderId, receiverId] });
       }
 
-      // 2. Create Message
       const message = await Message.create({
         sender: senderId,
         receiver: receiverId,
@@ -78,15 +89,14 @@ io.on("connection", (socket) => {
         chat: chat._id,
       });
 
-      // 3. Update chat's latestMessage
       chat.latestMessage = message._id;
       await chat.save();
 
-      // 4. Emit to both users
       const populatedMsg = await message.populate(
         "sender",
         "name profilePicture"
       );
+
       io.to(senderId).emit("receive_message", populatedMsg);
       io.to(receiverId).emit("receive_message", populatedMsg);
     } catch (err) {
@@ -101,14 +111,13 @@ io.on("connection", (socket) => {
     console.log("🚫 Socket disconnected:", socket.id);
   });
 });
-console.log(process.env.CLOUD_NAME);
 
+// ✅ CLOUDINARY UPLOAD
 cloudinary.config({
   cloud_name: process.env.CLOUD_NAME,
   api_key: process.env.API_KEY,
   api_secret: process.env.API_SECRET,
 });
-
 
 async function handleUpload(file) {
   const res = await cloudinary.uploader.upload(file, {
@@ -116,32 +125,28 @@ async function handleUpload(file) {
   });
   return res;
 }
+
 const storage = new multer.memoryStorage();
-const upload = multer({
-  storage,
-});
+const upload = multer({ storage });
+
 app.post("/upload", upload.single("my_file"), async (req, res) => {
   try {
     const b64 = Buffer.from(req.file.buffer).toString("base64");
-    // console.log(b64);
-    
-    let dataURI = "data:" + req.file.mimetype + ";base64," + b64;
-    console.log(dataURI);
-    
+    const dataURI = "data:" + req.file.mimetype + ";base64," + b64;
     const cldRes = await handleUpload(dataURI);
     res.json(cldRes);
   } catch (error) {
     console.log(error);
-    res.send({
-      message: error.message,
-    });
+    res.send({ message: error.message });
   }
 });
 
+// ✅ DB CONNECTION
+connectToDatabase();
 
-// 🟢 Start Server
+// ✅ START SERVER
 const PORT = process.env.PORT;
 server.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
 });
-console.log("checking");
+console.log("just checking")
