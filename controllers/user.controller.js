@@ -2,39 +2,48 @@ import { User } from "../models/User.js";
 import nodemailer from 'nodemailer';
 import bcrypt from 'bcryptjs';
 
+
+
 export const getProfile = async (req, res) => {
-    try {
-        const user = await User.findById(req.user.userId).select("-password");
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-        res.status(200).json(user);
-    } catch (error) {
-        console.error("Error fetching user profile:", error);
-        res.status(500).json({ message: "Internal server error" });
+  try {
+    const user = await User.findById(req.user.userId).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
-}
+    res.json(user);
+  } catch (error) {
+    console.error('Fetching profile failed:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 
 export const updateProfile = async (req, res) => {
-    const { name,bio, email } = req.body;
+    const { name, email, bio, profilePic } = req.body; // ✅ Use profilePic consistently
+
     if (!name || !email) {
         return res.status(400).json({ message: "Name and email are required" });
     }
+
     try {
         const user = await User.findByIdAndUpdate(
             req.user.userId,
-            { name, email,bio },
+            { name, email, bio, profilePic }, // ✅ Save the image URL here
             { new: true, runValidators: true }
         ).select("-password");
+
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
+
         res.status(200).json(user);
     } catch (error) {
         console.error("Error updating user profile:", error);
         res.status(500).json({ message: "Internal server error" });
     }
-}
+};
+
+
 export const forgotPassword = async (req, res) => {
   const { email } = req.body;
 
