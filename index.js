@@ -16,11 +16,16 @@ import { Chat } from "./models/chat.schema.js";
 import { Message } from "./models/message.schema.js";
 import cloudinary from "cloudinary";
 import multer from "multer";
+import path from "path";
 
 configDotenv();
 
 const app = express();
 const server = http.createServer(app);
+
+const __dirname = path.resolve();
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 
 // ✅ CORRECT CORS SETUP
 app.use(
@@ -58,6 +63,7 @@ app.use("/api/friends", friendRoutes);
 app.use("/api/chat",chatRoutes)
 app.use("/api/story",storyRoutes)
 app.use('/api/notification',notificationRoutes)
+
 // 🌍 DB Connection
 connectToDatabase();
 

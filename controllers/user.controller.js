@@ -1,6 +1,11 @@
 import { User } from "../models/User.js";
 import nodemailer from 'nodemailer';
 import bcrypt from 'bcryptjs';
+import fs from 'fs';
+import path from 'path';
+import cloudinary from '../utilities/cloudinary.js';
+// await cloudinary.uploader.destroy(publicId);
+
 
 export const getProfile = async (req, res) => {
     try {
@@ -14,6 +19,44 @@ export const getProfile = async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
     }
 }
+
+export const updateProfilePic = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (!req.file || !req.file.path || !req.file.filename) {
+      return res.status(400).json({ message: "No image uploaded" });
+    }
+
+    // ✅ Delete old image on Cloudinary
+    if (user.profilePicture?.public_id) {
+      await cloudinary.uploader.destroy(user.profilePicture.public_id);
+    }
+
+    // ✅ Save new Cloudinary info in DB
+    user.profilePicture = {
+      url: req.file.path,
+      public_id: req.file.filename,
+    };
+    await user.save();
+
+    const updatedUser = user.toObject();
+    delete updatedUser.password;
+
+    res.status(200).json({
+      message: "Profile picture updated successfully",
+      ...updatedUser,
+    });
+  } catch (error) {
+    console.error("Error updating profile picture:", error);
+    res.status(500).json({ message: "Failed to update profile picture" });
+  }
+};
+
+
+
+
 
 export const updateProfile = async (req, res) => {
     const { name,bio, email } = req.body;
@@ -35,6 +78,40 @@ export const updateProfile = async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
     }
 }
+
+// ----------------------
+// ✅ Remove Profile Picture
+// ----------------------
+export const removeProfilePic = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // ✅ Delete from Cloudinary
+    if (user.profilePicture?.public_id) {
+      await cloudinary.uploader.destroy(user.profilePicture.public_id);
+    }
+
+    // ✅ Remove from MongoDB
+    user.profilePicture = null;
+    await user.save();
+
+    const updatedUser = user.toObject();
+    delete updatedUser.password;
+
+    res.status(200).json({
+      message: "Profile picture removed successfully",
+      ...updatedUser,
+    });
+  } catch (error) {
+    console.error("Error removing profile picture:", error);
+    res.status(500).json({ message: "Failed to remove profile picture" });
+  }
+};
+
+
+
+
 export const forgotPassword = async (req, res) => {
   const { email } = req.body;
 
@@ -59,6 +136,7 @@ export const forgotPassword = async (req, res) => {
       to: email,
       subject: "Reset Your Password",
       text: `Your OTP code is: ${code}`,
+
     };
 
     await transporter.sendMail(mailOptions);
