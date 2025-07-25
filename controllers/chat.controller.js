@@ -15,7 +15,8 @@ export const getChatHistory = async (req, res) => {
                 .populate("sender", "name profilePicture")
                 .populate("chat")
                 .sort({ createdAt: 1 }); 
-
+            console.log(messages);
+            
                 res.status(200).json(messages)
         
         } catch (error) {

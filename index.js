@@ -104,6 +104,62 @@ io.on("connection", (socket) => {
     }
   });
 
+    socket.on("send_photo_message", async ({ senderId, receiverId, fileData, fileType }) => {
+    try {
+      // 1. Construct the data URI for Cloudinary upload
+      const dataURI = `data:${fileType};base64,${fileData}`;
+      
+      // 2. Upload the image to Cloudinary
+      const cldRes = await handleUpload(dataURI);
+      if (!cldRes || !cldRes.secure_url) {
+        throw new Error("Cloudinary upload failed, URL not returned.");
+      }
+      const imageUrl = cldRes.secure_url;
+
+      // 3. Find or create the chat (same logic as text messages)
+      let chat = await Chat.findOne({
+        isGroupChat: false,
+        users: { $all: [senderId, receiverId] },
+      });
+
+      if (!chat) {
+        chat = await Chat.create({ users: [senderId, receiverId] });
+      }
+      
+      // 4. Create the message with the special 'img+' format
+      const messageContent = `img+${imageUrl}`;
+      console.log(messageContent);
+      
+      const message = await Message.create({
+        sender: senderId,
+        receiver: receiverId,
+        content: messageContent,
+        chat: chat._id,
+      });
+
+      // 5. Update latest message in the chat
+      chat.latestMessage = message._id;
+      await chat.save();
+      
+      // 6. Populate the message with sender info for the client UI
+      const populatedMsg = await message.populate(
+        "sender",
+        "name profilePicture"
+      );
+      
+      // 7. Emit the new photo message to both users
+      io.to(senderId).emit("receive_message", populatedMsg);
+      io.to(receiverId).emit("receive_message", populatedMsg);
+
+    } catch (err) {
+      console.error("❌ Error sending photo message:", err);
+      // Optionally, emit an error back to the sender
+      socket.emit("message_error", { error: "Failed to send photo." });
+    }
+  });
+
+
+
   socket.on("disconnect", () => {
     for (const [userId, sockId] of usersSocketMap.entries()) {
       if (sockId === socket.id) usersSocketMap.delete(userId);

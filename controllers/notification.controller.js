@@ -44,9 +44,10 @@ export const markAsRead =async(req,res)=>{
 export const getMyNotifications = async (req,res)=>{
     try {
         const userId= req.user.userId
-
-        const notifications =await Notification.find({receipent:userId})
-        .populate('sender','name profilePicture')
+        console.log(userId);
+        
+        const notifications =await Notification.find({recipient:userId}).sort({createdAt:-1})
+        // .populate('sender','name profilePicture')
 
         res.status(200).json(notifications)
     } catch (error) {

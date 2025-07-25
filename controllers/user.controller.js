@@ -35,6 +35,9 @@ export const updateProfile = async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
     }
 }
+
+
+
 export const forgotPassword = async (req, res) => {
   const { email } = req.body;
 
