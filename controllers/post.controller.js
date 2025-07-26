@@ -40,6 +40,9 @@ export const addPost = async (req, res) => {
 
     if (req.file) {
       const b64 = Buffer.from(req.file.buffer).toString("base64");
+      console.log("Base64 Image String:", b64);
+      console.log("buffer:", req.file.buffer);
+      
       let dataURI = "data:" + req.file.mimetype + ";base64," + b64;
       const cldRes = await handleUpload(dataURI);
       imageUrl = cldRes.secure_url;
