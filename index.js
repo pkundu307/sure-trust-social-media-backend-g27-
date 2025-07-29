@@ -202,7 +202,9 @@ app.post("/upload", upload.single("my_file"), async (req, res) => {
     res.send({ message: error.message });
   }
 });
-
+app.get('/ch',(req,res)=>{
+  res.send("ok ")
+})
 // ✅ DB CONNECTION
 connectToDatabase();
 
