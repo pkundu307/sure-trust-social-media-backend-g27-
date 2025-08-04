@@ -208,7 +208,7 @@ connectToDatabase();
 
 // ✅ START SERVER
 const PORT = process.env.PORT;
-server.listen(PORT, () => {
+server.listen(PORT,'0.0.0.0', () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
 });
 console.log("just checking")
